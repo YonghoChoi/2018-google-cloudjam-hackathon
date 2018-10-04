@@ -1,11 +1,5 @@
 # GCP Hackathon 2018
 
-## VM에 SSH 키 사용해서 접속
-
-* 참고 : https://gongjak.me/2016/08/01/ssh%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%B4%EC%84%9C-vm%EC%97%90-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0/
-
-
-
 ## Kubernetes 클러스터 생성
 
 1. GCP 프로젝트에서 쿠버네티스 클러스터를 사용할 수 있도록 준비 절차가 필요하다. GCP Kubernetes Engine 페이지에 최조 접속 시 자동으로 준비 
@@ -187,3 +181,7 @@
      "tagline" : "You Know, for Search"
    }
    ```
+
+## VM에 SSH 키 사용해서 접속
+
+* 참고 : https://gongjak.me/2016/08/01/ssh%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%B4%EC%84%9C-vm%EC%97%90-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0/
