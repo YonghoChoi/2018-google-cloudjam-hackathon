@@ -1,13 +1,14 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: elasticsearch
+  name: elasticsearch-data-node
 spec:
-  replicas: 1
+  replicas: 2
   template:
     metadata:
       labels:
         app: elasticsearch
+        role: data
         version: 6.0.1
     spec:
       initContainers:
@@ -21,9 +22,9 @@ spec:
           privileged: true
       containers:
         - name: elasticsearch
-          image: "docker.elastic.co/elasticsearch/elasticsearch:6.0.1"
+          image: "yonghochoi/es-data:6.0.1.1"
           ports:
-            - name: es-external
+            - name: http
               containerPort: 9200
               hostPort: 9200
             - name: transport

@@ -1,0 +1,39 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: elasticsearch-master-node
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        role: master
+        version: 6.0.1
+    spec:
+      initContainers:
+      - name: init-pod
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: "yonghochoi/es-master:6.0.1"
+        ports:
+        - name: http
+          containerPort: 9200
+          hostPort: 9200
+        - name: transport
+          containerPort: 9300
+          hostPort: 9300
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9200
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
