@@ -1,5 +1,11 @@
 # GCP Hackathon 2018
 
+* 2018년 GCP Study Jam에서 진행한 GCP Hackathon을 위해 준비한 내용입니다.
+
+![](images/gcp-hackathon-2018.jpg)
+
+
+
 ## Kubernetes 클러스터 생성
 
 1. GCP 프로젝트에서 쿠버네티스 클러스터를 사용할 수 있도록 준비 절차가 필요하다. GCP Kubernetes Engine 페이지에 최조 접속 시 자동으로 준비 
@@ -61,7 +67,6 @@
    FROM docker.elastic.co/elasticsearch/elasticsearch:6.4.2
    
    RUN yum install -y gcc-c++ make zip
-   
    RUN wget http://www.kwangsiklee.com/wp-content/uploads/2017/02/mecab-0.996-ko-0.9.2.tar-1.gz
    RUN tar -xvzf mecab-0.996-ko-0.9.2.tar-1.gz
    RUN cd mecab-0.996-ko-0.9.2 && ./configure && make && make check && make install && ldconfig
@@ -71,10 +76,15 @@
    RUN cd mecab-ko-dic-2.1.1-20180720 && ./configure && make && make install
    
    COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
-   RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.0.0.1.zip
+   
+   RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip
    
    COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
    ```
+
+   * 은전한닢이 6.1.1.0 이후에 지원이되고 있지 않는데, Elasticsearch 최신 버전 6.4.2에서는 플러그인의 디렉토리 구조가 변경되어 정상적으로 설치되지 않는다.
+   * 최신 버전에서는 플러그인 압축파일 내 elasticsearch 디렉토리를 사용하지 않기 때문에 여기서는 elasticsearch 디렉토리 제거한 zip 파일을 Docker 이미지에 Copy해서 사용한다.
+   * 은전한닢 플러그인 설치 시에 elasticsearch.yml 파일을 참조하기 때문에 위에서 작성한 elasticsearch.yml 파일로 대체하는 것은 가장 마지막에 수행한다.
 
 
 
@@ -134,12 +144,13 @@
    metadata:
      name: elasticsearch
    spec:
-     replicas: 3
+     replicas: 1
      template:
        metadata:
          labels:
            app: elasticsearch
-           version: 6.0.1
+           role: master
+           version: 6.4.2
        spec:
          initContainers:
          - name: init-pod
@@ -151,27 +162,41 @@
            securityContext:
              privileged: true
          containers:
-           - name: elasticsearch
-             image: "yonghochoi/es-master:6.0.1"
-             ports:
-               - name: es-external
-                 containerPort: 9200
-                 hostPort: 9200
-               - name: transport
-                 containerPort: 9300
-                 hostPort: 9300
-             readinessProbe:
-               httpGet:
-                 path: /
-                 port: 9200
-               initialDelaySeconds: 10
-               periodSeconds: 15
-               timeoutSeconds: 5
+         - name: elasticsearch
+           image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
+           ports:
+           - name: es-external
+             containerPort: 9200
+             hostPort: 9200
+           - name: transport
+             containerPort: 9300
+             hostPort: 9300
+           env:
+           - name: CLUSTER_NAME
+             value: gcp-summit-es
+           - name: NUMBER_OF_MASTERS
+             value: "1"
+           - name: NODE_MASTER
+             value: "true"
+           - name: NODE_INGEST
+             value: "false"
+           - name: NODE_DATA
+             value: "false"
+           - name: NETWORK_HOST
+             value: "0.0.0.0"
+           - name: ES_JAVA_OPTS
+             value: -Xms256m -Xmx256m
+           readinessProbe:
+             httpGet:
+               path: /
+               port: 9200
+             initialDelaySeconds: 10
+             periodSeconds: 15
+             timeoutSeconds: 5
    ```
 
    * initContainers를 통해 Pod의 설정 초기화
    * readinessProbe를 통해 실행 가능 여부 체크
-   * 은전한닢 버전과 맞추기 위해 6.0.1 버전 사용
    * Master 노드와 Data 노드 구분을 위해 label에 role 부여
 
 2. Elasticsearch Master Deployment 생성
@@ -234,6 +259,7 @@
        metadata:
          labels:
            app: elasticsearch
+           role: data
            version: 6.0.1
        spec:
          initContainers:
@@ -246,15 +272,30 @@
            securityContext:
              privileged: true
          containers:
-           - name: elasticsearch
-             image: "yonghochoi/es-data:6.0.1"
-             ports:
-               - name: es-external
-                 containerPort: 9200
-                 hostPort: 9200
-               - name: transport
-                 containerPort: 9300
-                 hostPort: 9300
+         - name: elasticsearch
+           image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
+           ports:
+           - name: es-external
+             containerPort: 9200
+             hostPort: 9200
+           - name: transport
+             containerPort: 9300
+             hostPort: 9300
+           env:
+           - name: CLUSTER_NAME
+             value: gcp-summit-es
+           - name: NUMBER_OF_MASTERS
+             value: "1"
+           - name: NODE_MASTER
+             value: "false"
+           - name: NODE_INGEST
+             value: "false"
+           - name: NODE_DATA
+             value: "true"
+           - name: NETWORK_HOST
+             value: "0.0.0.0"
+           - name: ES_JAVA_OPTS
+             value: -Xms256m -Xmx256m
              readinessProbe:
                httpGet:
                  path: /
@@ -495,3 +536,37 @@
 
 * 가이드대로 진행 했으나 권한 오류 발생
 * GCP의 Credential 관련 부분 확인 필요
+
+
+
+### 은전한닢 버전 호환 문제 해결
+
+```
+-> Downloading file:///usr/share/elasticsearch/elasticsearch-analysis-seunjeon-6.1.1.0.zip
+[=================================================] 100%??
+Exception in thread "main" java.lang.IllegalArgumentException: Plugin [analysis-seunjeon] was built for Elasticsearch version 6.1.1 but version 6.4.2 is running
+        at org.elasticsearch.plugins.PluginsService.verifyCompatibility(PluginsService.java:339)
+        at org.elasticsearch.plugins.InstallPluginCommand.loadPluginInfo(InstallPluginCommand.java:717)
+        at org.elasticsearch.plugins.InstallPluginCommand.installPlugin(InstallPluginCommand.java:792)
+        at org.elasticsearch.plugins.InstallPluginCommand.install(InstallPluginCommand.java:775)
+        at org.elasticsearch.plugins.InstallPluginCommand.execute(InstallPluginCommand.java:231)
+        at org.elasticsearch.plugins.InstallPluginCommand.execute(InstallPluginCommand.java:216)
+        at org.elasticsearch.cli.EnvironmentAwareCommand.execute(EnvironmentAwareCommand.java:86)
+        at org.elasticsearch.cli.Command.mainWithoutErrorHandling(Command.java:124)
+        at org.elasticsearch.cli.MultiCommand.execute(MultiCommand.java:77)
+        at org.elasticsearch.cli.Command.mainWithoutErrorHandling(Command.java:124)
+        at org.elasticsearch.cli.Command.main(Command.java:90)
+        at org.elasticsearch.plugins.PluginCli.main(PluginCli.java:47)
+The command '/bin/sh -c ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip' returned a non-zero code: 1
+```
+
+
+
+
+
+
+
+# 참고
+
+* 엘라스틱서치 디스커버리 관련 : https://github.com/fabric8io/elasticsearch-cloud-kubernetes/blob/master/README.md
+* headless-service : https://kubernetes.io/docs/concepts/services-networking/service/#headless-services
