@@ -1,6 +1,4 @@
-FROM docker.elastic.co/elasticsearch/elasticsearch:6.0.1
-  
-MAINTAINER clghks@gmail.com
+FROM docker.elastic.co/elasticsearch/elasticsearch:6.4.2
 
 RUN yum install -y gcc-c++ make zip
 
@@ -12,7 +10,7 @@ RUN wget https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.1.1
 RUN tar -xvzf mecab-ko-dic-2.1.1-20180720.tar.gz
 RUN cd mecab-ko-dic-2.1.1-20180720 && ./configure && make && make install
 
-RUN wget https://bitbucket.org/eunjeon/seunjeon/raw/master/elasticsearch/scripts/downloader.sh && chmod +x downloader.sh && ./downloader.sh -e 6.0.1 -p 6.0.0.1
-RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.0.0.1.zip
+COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
+COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
 
-COPY elasticsearch.yml /usr/share/elasticsearch/config/elasticsearch.yml
+RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.0.0.1.zip

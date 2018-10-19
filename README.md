@@ -35,11 +35,98 @@
 
 
 
-## 엘라스틱서치 구성
+## 엘라스틱서치 이미지 구성
 
-### Elasticsearch Master
+### Elasticsearch Dockerfile
 
-1.  Deployment 작성
+1. elasticsearch.yml 준비
+
+   ```yaml
+   cluster.name: ${CLUSTER_NAME}
+   network.host: ${NETWORK_HOST}
+   
+   # Cluster Setting
+   node.master: ${NODE_MASTER}
+   node.data: ${NODE_DATA}
+   node.ingest: ${NODE_INGEST}
+   search.remote.connect: false
+   
+   discovery.zen.minimum_master_nodes: ${NUMBER_OF_MASTERS}
+   xpack.license.self_generated.type: basic
+   ```
+
+2. Dockerfile 작성
+
+   ```dockerfile
+   FROM docker.elastic.co/elasticsearch/elasticsearch:6.4.2
+   
+   RUN yum install -y gcc-c++ make zip
+   
+   RUN wget http://www.kwangsiklee.com/wp-content/uploads/2017/02/mecab-0.996-ko-0.9.2.tar-1.gz
+   RUN tar -xvzf mecab-0.996-ko-0.9.2.tar-1.gz
+   RUN cd mecab-0.996-ko-0.9.2 && ./configure && make && make check && make install && ldconfig
+   
+   RUN wget https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.1.1-20180720.tar.gz
+   RUN tar -xvzf mecab-ko-dic-2.1.1-20180720.tar.gz
+   RUN cd mecab-ko-dic-2.1.1-20180720 && ./configure && make && make install
+   
+   COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
+   RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.0.0.1.zip
+   
+   COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
+   ```
+
+
+
+### Container Registry에 이미지 push
+
+1. docker가 설치 되어있다는 전제 하에 진행. 먼저 docker build로 이미지 만들기
+
+   ```shell
+   docker build -t [이미지명] .
+   ```
+
+2. credential 정보 설정
+
+   ```shell
+   gcloud auth configure-docker
+   ```
+
+3. 프로젝트ID 확인
+
+   ```shell
+   gcloud projects list
+   ```
+
+4. 이미지명 태깅
+
+   ```shell
+   docker tag [이미지명] gcr.io/[프로젝트ID]/[이미지명]:[태그명]
+   ```
+
+   ```shell
+   ex) docker tag elasticsearch gcr.io/gcp-hackathon-2018/elasticsearch:6.4.2
+   ```
+
+5. 이미지 push
+
+   ```shell
+   docker push gcr.io/[PROJECT-ID]/[이미지명]:[태그명]
+   ```
+
+6. 브라우저에서 이미지 확인
+
+   ```shell
+   http://gcr.io/[PROJECT-ID]/[이미지명]:[태그명]
+   ```
+
+
+
+## Kubernetes Elasticsearch Cluster 구성
+
+### Elasticsearch Master Node
+
+1. Deployment 작성
 
    ```shell
    apiVersion: extensions/v1beta1
@@ -294,44 +381,6 @@
      "task_max_waiting_in_queue_millis" : 0,
      "active_shards_percent_as_number" : 100.0
    }
-   ```
-
-
-
-## Container Registry에 이미지 push
-
-1. docker가 설치 되어있다는 전제 하에 진행. 먼저 docker build로 이미지 만들기
-
-   ```shell
-   docker build -t [이미지명] .
-   ```
-
-2. credential 정보 설정
-
-   ```shell
-   gcloud auth configure-docker
-   ```
-
-3. 이미지명 태깅
-
-   ```shell
-   docker tag [이미지명] gcr.io/[PROJECT-ID]/[이미지명]:[태그명]
-   ```
-
-   ```shell
-   ex) docker tag elasticsearch gcr.io/gcp-hackathon-2018/elasticsearch:6.0.1
-   ```
-
-4. 이미지 push
-
-   ```shell
-   docker push gcr.io/[PROJECT-ID]/[이미지명]:[태그명]
-   ```
-
-5. 브라우저에서 이미지 확인
-
-   ```shell
-   http://gcr.io/[PROJECT-ID]/[이미지명]:[태그명]
    ```
 
 
