@@ -22,16 +22,19 @@
 
 ## Kubernetes 설정
 
-* 서비스 계정 생성
+1. 서비스 계정 생성
 
-  ```
-  cat <<EOF | kubectl create -f -
-  apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: elasticsearch
-  EOF
-  ```
+   ```shell
+   kubectl create sa elasticsearch
+   ```
+
+2. 서비스 계정에 권한 부여
+
+   ```shell
+   kubectl create clusterrolebinding cluster-admin-for-elasticsearch --clusterrole=cluster-admin --user=elasticsearch
+   ```
+
+   * 여기서는 관리 편의를 위해 cluster 전체에 대해 admin 권한을 부여하였다.
 
 
 
