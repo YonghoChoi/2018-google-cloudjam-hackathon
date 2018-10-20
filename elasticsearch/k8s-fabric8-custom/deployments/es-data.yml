@@ -38,7 +38,7 @@ spec:
             - name: "NODE_MASTER"
               value: "false"
 
-          image: "fabric8/elasticsearch-k8s:6.2.3"
+          image: "gcr.io/gcp-summit-2018/elasticsearch:6.2.3"
           name: "elasticsearch"
           ports:
             - containerPort: 9300
