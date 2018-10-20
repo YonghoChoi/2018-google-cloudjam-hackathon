@@ -31,7 +31,9 @@
 2. 서비스 계정에 권한 부여
 
    ```shell
-   kubectl create clusterrolebinding cluster-admin-for-elasticsearch --clusterrole=cluster-admin --user=elasticsearch
+   kubectl create --save-config -f accounts/role.yml
    ```
 
    - 여기서는 관리 편의를 위해 cluster 전체에 대해 admin 권한을 부여하였다.
+
+3. 

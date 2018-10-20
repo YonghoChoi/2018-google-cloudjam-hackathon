@@ -1,0 +1,48 @@
+apiVersion: extensions/v1beta1
+kind: "Deployment"
+metadata:
+  name: "elasticsearch-coordinating-only"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: "elasticsearch"
+      type: "coordinating-only"
+      provider: "fabric8"
+  template:
+    metadata:
+      labels:
+        component: "elasticsearch"
+        type: "coordinating-only"
+        provider: "fabric8"
+    spec:
+      serviceAccount: elasticsearch
+      serviceAccountName: elasticsearch
+      initContainers:
+      - name: init-pod
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+        - env:
+            - name: "SERVICE"
+              value: "elasticsearch-cluster"
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+            - name: "NODE_DATA"
+              value: "false"
+            - name: "NODE_MASTER"
+              value: "false"
+          image: "fabric8/elasticsearch-k8s:6.2.3"
+          name: "elasticsearch"
+          ports:
+            - containerPort: 9200
+              name: "http"
+            - containerPort: 9300
+              name: "transport"
