@@ -4,6 +4,7 @@ network.host: ${NETWORK_HOST}
 node.master: ${NODE_MASTER}
 node.data: ${NODE_DATA}
 node.ingest: ${NODE_INGEST}
+http.enabled: ${HTTP_ENABLED}
 
 cloud:
   kubernetes:

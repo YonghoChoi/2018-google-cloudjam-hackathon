@@ -217,18 +217,18 @@ spec:
 ### Discovery를 위한 Service 작성
 
 ```yaml
-kind: Service
 apiVersion: v1
+kind: "Service"
 metadata:
-  name: "elasticsearch-discovery"
+  name: "elasticsearch-cluster"
 spec:
-  selector:
-    app: "elasticsearch"
-    role: "master"
+  clusterIP: "None"
   ports:
-  - protocol: "TCP"
-    port: 9300
-    name: transport
+    - port: 9300
+      targetPort: 9300
+  selector:
+    provider: "fabric8"
+    component: "elasticsearch"
 ```
 
 * Elasticsearch에서 클러스터의 각 노드들을 발견하기 위해서 Zen Discovery를 사용하는데, 이 때 각 노드를 찾기 위해 transport 모듈을 사용하게 된다. Deployment 설정에서 transport 통신을 위한 포트를 9300으로 지정했기 때문에 서비스 생성 시 클러스터 내 노드간 통신을 위해 9300 포트를 지정한다.
@@ -238,19 +238,19 @@ spec:
 #### 3.2.1 외부에서 쿼리 요청을 받기 위한 Service 작성
 
 ```yaml
-kind: Service
 apiVersion: v1
+kind: "Service"
 metadata:
   name: "elasticsearch"
 spec:
-  selector:
-    app: "elasticsearch"
   ports:
-    - protocol: "TCP"
-      port: 9200
-      targetPort: 9200
-      nodePort: 30001
-  type: NodePort
+    - port: 9200
+      targetPort: "http"
+  selector:
+    component: "elasticsearch"
+    type: "coordinating-only"
+    provider: "fabric8"
+  type: "LoadBalancer"
 ```
 
 - port는 서비스 레벨에서 pod와 매핑할 port 번호를 의미
@@ -471,5 +471,7 @@ The command '/bin/sh -c ./bin/elasticsearch-plugin install file://`pwd`/elastics
 
 ## 5. 참고
 
-* 엘라스틱서치 디스커버리 관련 : https://github.com/fabric8io/elasticsearch-cloud-kubernetes/blob/master/README.md
-* headless-service : https://kubernetes.io/docs/concepts/services-networking/service/#headless-services
+* [엘라스틱서치 디스커버리 관련](https://github.com/fabric8io/elasticsearch-cloud-kubernetes/blob/master/README.md)
+* [headless-service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services)
+* [엘라스틱서치 클러스터 구성](http://kimjmin.net/2018/01/2018-01-build-es-cluster-5/)
+* [Elasticsearch Node](https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html)
