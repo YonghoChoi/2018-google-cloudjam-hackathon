@@ -82,29 +82,11 @@
 10. 클러스터 구성 확인
 
     ```shell
-    curl 35.189.158.229:9200/_cluster/state?pretty
+    curl localhost:9200/_cat/nodes?v
     
     # 결과
-      ... 생략 ...
-      "nodes" : {
-        "bCKvOEi5RaWQjiE4z5g7kw" : {
-          "name" : "bCKvOEi",
-          "ephemeral_id" : "33CrftxYSu6RGF0xpSTemA",
-          "transport_address" : "10.56.0.17:9300",
-          "attributes" : { }
-        },
-        "8Xe6ZJBpQ-Ks4NKv30FqSQ" : {
-          "name" : "8Xe6ZJB",
-          "ephemeral_id" : "bkq5RH-TTwGddGJn7IFVWg",
-          "transport_address" : "10.56.0.18:9300",
-          "attributes" : { }
-        },
-        "jzU-eDYoT9e6BVJEOrPCDA" : {
-          "name" : "jzU-eDY",
-          "ephemeral_id" : "yf-Szx-MRdKpS7WVXNMHNQ",
-          "transport_address" : "10.56.0.16:9300",
-          "attributes" : { }
-        }
-      },
-      ... 생략 ...
+    ip         heap.percent ram.percent cpu load_1m load_5m load_15m node.role master name
+    10.56.0.27           58          68  45    0.96    1.55     1.48 -         -      i0euTCS
+    10.56.0.26           58          68  46    0.96    1.55     1.48 m         *      xx_wKcR
+    10.56.0.28           41          68  46    0.96    1.55     1.48 d         -      RPnN3Aq
     ```

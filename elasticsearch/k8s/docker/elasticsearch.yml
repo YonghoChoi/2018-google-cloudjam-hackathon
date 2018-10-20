@@ -1,0 +1,14 @@
+cluster.name: ${CLUSTER_NAME}
+network.host: ${NETWORK_HOST}
+
+node.master: ${NODE_MASTER}
+node.data: ${NODE_DATA}
+node.ingest: ${NODE_INGEST}
+
+cloud:
+  kubernetes:
+    service: ${SERVICE}
+    namespace: ${KUBERNETES_NAMESPACE}
+discovery.zen.hosts_provider: kubernetes
+discovery.zen.minimum_master_nodes: ${NUMBER_OF_MASTERS}
+xpack.license.self_generated.type: basic

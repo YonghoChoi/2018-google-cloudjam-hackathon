@@ -45,3 +45,10 @@ spec:
           ports:
             - containerPort: 9300
               name: "transport"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5

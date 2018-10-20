@@ -1,11 +1,9 @@
 cluster.name: ${CLUSTER_NAME}
 network.host: ${NETWORK_HOST}
 
-# Cluster Setting
 node.master: ${NODE_MASTER}
 node.data: ${NODE_DATA}
 node.ingest: ${NODE_INGEST}
-search.remote.connect: false
 
 cloud:
   kubernetes:

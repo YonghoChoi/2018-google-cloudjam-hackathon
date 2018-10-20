@@ -49,6 +49,13 @@ spec:
             - mountPath: "/usr/share/elasticsearch/data"
               name: "elasticsearch-data"
               readOnly: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
       volumes:
         - emptyDir:
             medium: ""

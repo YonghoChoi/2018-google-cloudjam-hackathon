@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: "Service"
+metadata:
+  name: "elasticsearch"
+spec:
+  ports:
+    - port: 9200
+      targetPort: "http"
+  selector:
+    component: "elasticsearch"
+    type: "coordinating-only"
+    provider: "fabric8"
+  type: "LoadBalancer"
