@@ -37,6 +37,8 @@ spec:
                   fieldPath: "metadata.namespace"
             - name: "NODE_MASTER"
               value: "false"
+            - name: "ES_JAVA_OPTS"
+              value: "-Xms250m -Xmx250m"
 
           image: "gcr.io/gcp-summit-2018/elasticsearch:6.2.3"
           name: "elasticsearch"
