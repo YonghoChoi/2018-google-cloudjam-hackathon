@@ -37,6 +37,10 @@ spec:
                   fieldPath: "metadata.namespace"
             - name: "NODE_MASTER"
               value: "false"
+            - name: "NODE_DATA"
+              value: "true"
+            - name: "NODE_INGEST"
+              value: "true"
             - name: "ES_JAVA_OPTS"
               value: "-Xms250m -Xmx250m"
 
