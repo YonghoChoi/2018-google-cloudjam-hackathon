@@ -9,7 +9,7 @@ ENV SERVICE=es-k8s-cluster
 ENV KUBERNETES_NAMESPACE=default
 ENV NUMBER_OF_MASTERS=1
 
-RUN yum install -y gcc-c++ make zip
+RUN yum install -y gcc-c++ make zip deltarpm
 RUN wget http://www.kwangsiklee.com/wp-content/uploads/2017/02/mecab-0.996-ko-0.9.2.tar-1.gz
 RUN tar -xvzf mecab-0.996-ko-0.9.2.tar-1.gz
 RUN cd mecab-0.996-ko-0.9.2 && ./configure && make && make check && make install && ldconfig

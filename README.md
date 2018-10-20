@@ -6,7 +6,7 @@
 
 
 
-## Kubernetes 클러스터 생성
+## 1. Kubernetes 클러스터 생성
 
 1. GCP 프로젝트에서 쿠버네티스 클러스터를 사용할 수 있도록 준비 절차가 필요하다. GCP Kubernetes Engine 페이지에 최조 접속 시 자동으로 준비 
 
@@ -41,9 +41,9 @@
 
 
 
-## 엘라스틱서치 이미지 구성
+## 2. 엘라스틱서치 이미지 구성
 
-### Elasticsearch Dockerfile
+### 2.1 Elasticsearch Dockerfile
 
 1. elasticsearch.yml 준비
 
@@ -51,12 +51,16 @@
    cluster.name: ${CLUSTER_NAME}
    network.host: ${NETWORK_HOST}
    
-   # Cluster Setting
    node.master: ${NODE_MASTER}
    node.data: ${NODE_DATA}
    node.ingest: ${NODE_INGEST}
    search.remote.connect: false
    
+   cloud:
+     kubernetes:
+       service: ${SERVICE}
+       namespace: ${KUBERNETES_NAMESPACE}
+   discovery.zen.hosts_provider: kubernetes
    discovery.zen.minimum_master_nodes: ${NUMBER_OF_MASTERS}
    xpack.license.self_generated.type: basic
    ```
@@ -64,7 +68,16 @@
 2. Dockerfile 작성
 
    ```dockerfile
-   FROM docker.elastic.co/elasticsearch/elasticsearch:6.4.2
+   FROM docker.elastic.co/elasticsearch/elasticsearch:6.2.3
+   
+   ENV CLUSTER_NAME=es-k8s-cluster
+   ENV NETWORK_HOST=0.0.0.0
+   ENV NODE_MASTER=true
+   ENV NODE_DATA=true
+   ENV NODE_INGEST=false
+   ENV SERVICE=es-k8s-cluster
+   ENV KUBERNETES_NAMESPACE=default
+   ENV NUMBER_OF_MASTERS=1
    
    RUN yum install -y gcc-c++ make zip
    RUN wget http://www.kwangsiklee.com/wp-content/uploads/2017/02/mecab-0.996-ko-0.9.2.tar-1.gz
@@ -75,20 +88,21 @@
    RUN tar -xvzf mecab-ko-dic-2.1.1-20180720.tar.gz
    RUN cd mecab-ko-dic-2.1.1-20180720 && ./configure && make && make install
    
+   COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
    COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
    
    RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip
-   
-   COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
+   RUN ./bin/elasticsearch-plugin install io.fabric8:elasticsearch-cloud-kubernetes:6.2.3.2
    ```
 
    * 은전한닢이 6.1.1.0 이후에 지원이되고 있지 않는데, Elasticsearch 최신 버전 6.4.2에서는 플러그인의 디렉토리 구조가 변경되어 정상적으로 설치되지 않는다.
    * 최신 버전에서는 플러그인 압축파일 내 elasticsearch 디렉토리를 사용하지 않기 때문에 여기서는 elasticsearch 디렉토리 제거한 zip 파일을 Docker 이미지에 Copy해서 사용한다.
    * 은전한닢 플러그인 설치 시에 elasticsearch.yml 파일을 참조하기 때문에 위에서 작성한 elasticsearch.yml 파일로 대체하는 것은 가장 마지막에 수행한다.
+   * 쿠버네티스 클러스터에서 엘라스틱서치 노드간 Discovery를 위해 fabric8 플러그인을 사용한다.
 
 
 
-### Container Registry에 이미지 push
+### 2.2 Container Registry에 이미지 push
 
 1. docker가 설치 되어있다는 전제 하에 진행. 먼저 docker build로 이미지 만들기
 
@@ -132,236 +146,130 @@
 
 
 
-## Kubernetes Elasticsearch Cluster 구성
+## 3. Kubernetes Elasticsearch Cluster 구성
 
-### Elasticsearch Master Node
+### 3.1 Deployment 구성
 
-1. Deployment 작성
+```shell
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: elasticsearch
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        role: master
+        version: 6.4.2
+    spec:
+      initContainers:
+      - name: init-pod
+        image: busybox:1.27.2
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
+        ports:
+        - name: es-external
+          containerPort: 9200
+          hostPort: 9200
+        - name: transport
+          containerPort: 9300
+          hostPort: 9300
+        env:
+        - name: CLUSTER_NAME
+          value: gcp-summit-es
+        - name: NUMBER_OF_MASTERS
+          value: "1"
+        - name: NODE_MASTER
+          value: "true"
+        - name: NODE_INGEST
+          value: "false"
+        - name: NODE_DATA
+          value: "false"
+        - name: NETWORK_HOST
+          value: "0.0.0.0"
+        - name: ES_JAVA_OPTS
+          value: -Xms256m -Xmx256m
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9200
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
+```
 
-   ```shell
-   apiVersion: extensions/v1beta1
-   kind: Deployment
-   metadata:
-     name: elasticsearch
-   spec:
-     replicas: 1
-     template:
-       metadata:
-         labels:
-           app: elasticsearch
-           role: master
-           version: 6.4.2
-       spec:
-         initContainers:
-         - name: init-pod
-           image: busybox:1.27.2
-           command:
-           - sysctl
-           - -w
-           - vm.max_map_count=262144
-           securityContext:
-             privileged: true
-         containers:
-         - name: elasticsearch
-           image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
-           ports:
-           - name: es-external
-             containerPort: 9200
-             hostPort: 9200
-           - name: transport
-             containerPort: 9300
-             hostPort: 9300
-           env:
-           - name: CLUSTER_NAME
-             value: gcp-summit-es
-           - name: NUMBER_OF_MASTERS
-             value: "1"
-           - name: NODE_MASTER
-             value: "true"
-           - name: NODE_INGEST
-             value: "false"
-           - name: NODE_DATA
-             value: "false"
-           - name: NETWORK_HOST
-             value: "0.0.0.0"
-           - name: ES_JAVA_OPTS
-             value: -Xms256m -Xmx256m
-           readinessProbe:
-             httpGet:
-               path: /
-               port: 9200
-             initialDelaySeconds: 10
-             periodSeconds: 15
-             timeoutSeconds: 5
-   ```
-
-   * initContainers를 통해 Pod의 설정 초기화
-   * readinessProbe를 통해 실행 가능 여부 체크
-   * Master 노드와 Data 노드 구분을 위해 label에 role 부여
-
-2. Elasticsearch Master Deployment 생성
-
-   ```shell
-   kubectl create -f deployments/elasticsearch-master.yml
-   ```
-
-3. Discovery를 위한 Service 작성
-
-   ```yaml
-   kind: Service
-   apiVersion: v1
-   metadata:
-     name: "elasticsearch-discovery"
-   spec:
-     selector:
-       app: "elasticsearch"
-       role: "master"
-     ports:
-     - protocol: "TCP"
-       port: 9300
-       name: transport
-   ```
-
-   * Elasticsearch에서 클러스터의 각 노드들을 발견하기 위해서 Zen Discovery를 사용하는데, 이 때 각 노드를 찾기 위해 transport 모듈을 사용하게 된다. Deployment 설정에서 transport 통신을 위한 포트를 9300으로 지정했기 때문에 서비스 생성 시 클러스터 내 노드간 통신을 위해 9300 포트를 지정한다.
-   * 내부통신이기 때문에 로드밸런서 타입은 ClusterIP를 사용한다.
-
-4. 서비스 생성
-
-   ```
-   kubectl create -f services/discovery.yml
-   ```
-
-5. 서비스 ClusterIP 확인
-
-   ```shell
-   kubectl get services
-   ```
-
-   ```shell
-   NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
-   elasticsearch-discovery   ClusterIP   10.47.251.46   <none>        9300/TCP         18m
-   kubernetes                ClusterIP   10.47.240.1    <none>        443/TCP          3h
-   ```
+* initContainers를 통해 Pod의 설정 초기화
+* readinessProbe를 통해 실행 가능 여부 체크
 
 
 
-### Elasticsearch Data Node
+### 3.2 서비스 구성
 
-1. Deployment 작성
+### Discovery를 위한 Service 작성
 
-   ```shell
-   apiVersion: extensions/v1beta1
-   kind: Deployment
-   metadata:
-     name: elasticsearch
-   spec:
-     replicas: 3
-     template:
-       metadata:
-         labels:
-           app: elasticsearch
-           role: data
-           version: 6.0.1
-       spec:
-         initContainers:
-         - name: init-pod
-           image: busybox:1.27.2
-           command:
-           - sysctl
-           - -w
-           - vm.max_map_count=262144
-           securityContext:
-             privileged: true
-         containers:
-         - name: elasticsearch
-           image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
-           ports:
-           - name: es-external
-             containerPort: 9200
-             hostPort: 9200
-           - name: transport
-             containerPort: 9300
-             hostPort: 9300
-           env:
-           - name: CLUSTER_NAME
-             value: gcp-summit-es
-           - name: NUMBER_OF_MASTERS
-             value: "1"
-           - name: NODE_MASTER
-             value: "false"
-           - name: NODE_INGEST
-             value: "false"
-           - name: NODE_DATA
-             value: "true"
-           - name: NETWORK_HOST
-             value: "0.0.0.0"
-           - name: ES_JAVA_OPTS
-             value: -Xms256m -Xmx256m
-             readinessProbe:
-               httpGet:
-                 path: /
-                 port: 9200
-               initialDelaySeconds: 10
-               periodSeconds: 15
-               timeoutSeconds: 5
-   ```
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "elasticsearch-discovery"
+spec:
+  selector:
+    app: "elasticsearch"
+    role: "master"
+  ports:
+  - protocol: "TCP"
+    port: 9300
+    name: transport
+```
 
-   * es-data 도커 이미지의 elasticsearch.yml 파일에는 위 Discovery를 위한 서비스의 ClusterIP가 설정되어 있음
+* Elasticsearch에서 클러스터의 각 노드들을 발견하기 위해서 Zen Discovery를 사용하는데, 이 때 각 노드를 찾기 위해 transport 모듈을 사용하게 된다. Deployment 설정에서 transport 통신을 위한 포트를 9300으로 지정했기 때문에 서비스 생성 시 클러스터 내 노드간 통신을 위해 9300 포트를 지정한다.
+* 내부통신이기 때문에 로드밸런서 타입은 ClusterIP를 사용한다.
 
-     ```
-     discovery.zen.ping.unicast.hosts: ["10.47.251.46"]
-     ```
 
-2. 외부에서 쿼리 요청을 받기 위한 Service 작성
+#### 3.2.1 외부에서 쿼리 요청을 받기 위한 Service 작성
 
-   ```yaml
-   kind: Service
-   apiVersion: v1
-   metadata:
-     name: "elasticsearch"
-   spec:
-     selector:
-       app: "elasticsearch"
-     ports:
-       - protocol: "TCP"
-         port: 9200
-         targetPort: 9200
-         nodePort: 30001
-     type: NodePort
-   ```
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "elasticsearch"
+spec:
+  selector:
+    app: "elasticsearch"
+  ports:
+    - protocol: "TCP"
+      port: 9200
+      targetPort: 9200
+      nodePort: 30001
+  type: NodePort
+```
 
-   * port는 서비스 레벨에서 pod와 매핑할 port 번호를 의미
-   * targetPort는 Pod의 port 번호를 의미
-   * NodePort의 Range가 30000-32767 이기 때문에 해당 범위내로 포트 변경
-   * Node Selector에 명시된 label이 Pod에 적용이 되어 있어야 정상적으로 해당 Pod에 NodePort가 연결된다.
-   * 위 예에서는 app=elasticsearch Label이 Pod에 정의 되어있어야함
+- port는 서비스 레벨에서 pod와 매핑할 port 번호를 의미
+- targetPort는 Pod의 port 번호를 의미
+- NodePort의 Range가 30000-32767 이기 때문에 해당 범위내로 포트 변경
+- Node Selector에 명시된 label이 Pod에 적용이 되어 있어야 정상적으로 해당 Pod에 NodePort가 연결된다.
+- 위 예에서는 app=elasticsearch Label이 Pod에 정의 되어있어야함
 
-3. Service 생성
 
-   ```
-   kubectl create -f services/elasticsearch.yml
-   ```
 
-4. Service 확인
+### 3.2.2 Elasticsearch로 접속 확인
 
-   ```
-   kubectl get services
-   ```
-
-   ```
-   NAME                      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
-   elasticsearch             NodePort    10.47.254.94   <none>        9200:30001/TCP   18m
-   elasticsearch-discovery   ClusterIP   10.47.251.46   <none>        9300/TCP         18m
-   kubernetes                ClusterIP   10.47.240.1    <none>        443/TCP          3h
-   ```
-
-5. 30001 방화벽 오픈
+1. 30001 방화벽 오픈
 
    ```
    gcloud compute firewall-rules create allow-elasticsearch-nodeport --allow=tcp:30001
    ```
 
-6. 쿠버네티스 워커 노드 인스턴스 주소 확인
+2. 쿠버네티스 워커 노드 인스턴스 주소 확인
 
    ```
    gcloud compute instances list
@@ -375,7 +283,7 @@
    gke-hackathon-default-pool-d208988f-gqjs  asia-northeast1-b  n1-standard-1                           10.146.0.5   35.200.93.117  RUNNING
    ```
 
-7. Elasticsearch 접속 확인
+3. Elasticsearch 접속 확인
 
    ```
    curl 35.221.127.30:30001
@@ -399,7 +307,7 @@
    }
    ```
 
-8. 클러스터 연결 확인
+4. 클러스터 연결 확인
 
    ```
    curl 35.200.12.206:30001/_cluster/health?pretty
@@ -427,15 +335,9 @@
 
 
 
-## VM에 SSH 키 사용해서 접속
+## 4. Trouble Shooting
 
-* 참고 : https://gongjak.me/2016/08/01/ssh%EB%A5%BC-%EC%9D%B4%EC%9A%A9%ED%95%B4%EC%84%9C-vm%EC%97%90-%EC%A0%91%EC%86%8D%ED%95%98%EA%B8%B0/
-
-
-
-## Trouble Shooting
-
-### ConfigMap 사용
+### 4.1 ConfigMap 사용
 
 * ConfigMap으로 설정관리 시 다음과 같이 설정했더니 오류 발생
 
@@ -533,14 +435,14 @@
 
 
 
-### GCP Registry 사용
+### 4.2 GCP Registry 사용
 
 * 가이드대로 진행 했으나 권한 오류 발생
 * GCP의 Credential 관련 부분 확인 필요
 
 
 
-### 은전한닢 버전 호환 문제 해결
+### 4.3 은전한닢 버전 호환 문제 해결
 
 ```
 -> Downloading file:///usr/share/elasticsearch/elasticsearch-analysis-seunjeon-6.1.1.0.zip
@@ -567,7 +469,7 @@ The command '/bin/sh -c ./bin/elasticsearch-plugin install file://`pwd`/elastics
 
 
 
-# 참고
+## 5. 참고
 
 * 엘라스틱서치 디스커버리 관련 : https://github.com/fabric8io/elasticsearch-cloud-kubernetes/blob/master/README.md
 * headless-service : https://kubernetes.io/docs/concepts/services-networking/service/#headless-services
