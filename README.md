@@ -222,7 +222,8 @@
        name: transport
    ```
 
-   * 내부통신이기 때문에 ClusterIP 사용
+   * Elasticsearch에서 클러스터의 각 노드들을 발견하기 위해서 Zen Discovery를 사용하는데, 이 때 각 노드를 찾기 위해 transport 모듈을 사용하게 된다. Deployment 설정에서 transport 통신을 위한 포트를 9300으로 지정했기 때문에 서비스 생성 시 클러스터 내 노드간 통신을 위해 9300 포트를 지정한다.
+   * 내부통신이기 때문에 로드밸런서 타입은 ClusterIP를 사용한다.
 
 4. 서비스 생성
 

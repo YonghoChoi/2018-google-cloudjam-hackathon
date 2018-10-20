@@ -1,0 +1,42 @@
+kind: "ReplicationController"
+metadata:
+  name: "elasticsearch-data"
+spec:
+  replicas: 1
+  selector:
+    component: "elasticsearch"
+    type: "data"
+    provider: "fabric8"
+  template:
+    metadata:
+      labels:
+        component: "elasticsearch"
+        type: "data"
+        provider: "fabric8"
+    spec:
+      serviceAccount: elasticsearch
+      serviceAccountName: elasticsearch
+      containers:
+        - env:
+            - name: "SERVICE"
+              value: "elasticsearch-cluster"
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+            - name: "NODE_MASTER"
+              value: "false"
+
+          image: "fabric8/elasticsearch-k8s:6.2.3"
+          name: "elasticsearch"
+          ports:
+            - containerPort: 9300
+              name: "transport"
+          volumeMounts:
+            - mountPath: "/usr/share/elasticsearch/data"
+              name: "elasticsearch-data"
+              readOnly: false
+      volumes:
+        - emptyDir:
+            medium: ""
+          name: "elasticsearch-data"
