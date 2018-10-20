@@ -1,3 +1,4 @@
+apiVersion: extensions/v1beta1
 kind: "ReplicationController"
 metadata:
   name: "elasticsearch-coordinating-only"
