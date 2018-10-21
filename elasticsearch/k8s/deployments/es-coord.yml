@@ -41,6 +41,8 @@ spec:
               value: "false"
             - name: "NODE_INGEST"
               value: "true"
+            - name: "HTTP_ENABLED"
+              value: "true"
             - name: "ES_JAVA_OPTS"
               value: "-Xms250m -Xmx250m"
           image: "gcr.io/gcp-summit-2018/elasticsearch:6.2.3"

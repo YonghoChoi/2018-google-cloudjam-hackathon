@@ -3,7 +3,7 @@ kind: "Deployment"
 metadata:
   name: "elasticsearch-data"
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       component: "elasticsearch"
@@ -36,7 +36,7 @@ spec:
                 fieldRef:
                   fieldPath: "metadata.namespace"
             - name: "NODE_MASTER"
-              value: "false"
+              value: "true"
             - name: "NODE_DATA"
               value: "true"
             - name: "NODE_INGEST"
