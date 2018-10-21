@@ -14,8 +14,10 @@
 
    ```shell
    gcloud config set compute/zone asia-northeast1-b
-   gcloud container clusters create hackathon
+   gcloud container clusters create hackathon --machine-type n1-standard-2
    ```
+
+   * Elasticsearch 구동을 위해 n1-standard-2 머신 유형 사용 (vcpu : 2, mem : 7.50g)
 
 3. 다른 인스턴스에서 kubectl 명령으로 관리하려는 경우 다음 명령 실행
 
