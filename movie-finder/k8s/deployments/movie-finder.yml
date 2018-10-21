@@ -1,0 +1,19 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: movie-finder-deployment
+spec:
+  selector:
+    matchLabels: 
+      app: movie-finder
+  replicas: 2
+  template: 
+    metadata:
+      labels:
+        app: movie-finder
+    spec:
+      containers:
+      - name: movie-finder
+        image: wowyo3/movie-finder-javacafe
+        ports:
+        - containerPort: 8080
