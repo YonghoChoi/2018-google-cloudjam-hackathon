@@ -21,6 +21,7 @@ RUN cd mecab-ko-dic-2.1.1-20180720 && ./configure && make && make install
 
 COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
 COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
+COPY --chown=elasticsearch:elasticsearch elasticsearch-hangul-jamo-analyzer-6.2.3.zip /usr/share/elasticsearch/
 
 RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip
 RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-hangul-jamo-analyzer-6.2.3.zip
