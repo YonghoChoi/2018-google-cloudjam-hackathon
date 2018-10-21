@@ -44,6 +44,7 @@ spec:
             - name: "ES_JAVA_OPTS"
               value: "-Xms1g -Xmx1g"
           image: "gcr.io/gcp-summit-2018/elasticsearch:6.2.3"
+          imagePullPolicy: Always
           name: "elasticsearch"
           ports:
             - containerPort: 9200
