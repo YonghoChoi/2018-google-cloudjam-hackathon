@@ -23,4 +23,5 @@ COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsea
 COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
 
 RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip
+RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-hangul-jamo-analyzer-6.2.3.zip
 RUN ./bin/elasticsearch-plugin install io.fabric8:elasticsearch-cloud-kubernetes:6.2.3.2
