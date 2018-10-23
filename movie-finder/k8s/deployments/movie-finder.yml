@@ -11,6 +11,7 @@ spec:
     metadata:
       labels:
         app: movie-finder
+        role: es-connect
     spec:
       containers:
       - name: movie-finder

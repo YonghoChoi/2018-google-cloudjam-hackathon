@@ -9,6 +9,7 @@ spec:
       component: "elasticsearch"
       type: "coordinating-only"
       provider: "fabric8"
+      role: es-connect
   template:
     metadata:
       labels:
