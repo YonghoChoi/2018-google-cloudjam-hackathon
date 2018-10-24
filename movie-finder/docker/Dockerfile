@@ -1,7 +1,7 @@
 FROM nginx
 
 RUN mkdir /app
-ADD ./dist/ /app
-ADD nginx/nginx.conf /etc/nginx/nginx.conf
+ADD ./app/dist/ /app
+ADD ./app/nginx/nginx.conf /etc/nginx/nginx.conf
 
 WORKDIR /app
