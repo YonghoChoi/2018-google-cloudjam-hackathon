@@ -9,13 +9,14 @@ spec:
       component: "elasticsearch"
       type: "coordinating-only"
       provider: "fabric8"
-      role: es-connect
+      role: "es-connect"
   template:
     metadata:
       labels:
         component: "elasticsearch"
         type: "coordinating-only"
         provider: "fabric8"
+        role: "es-connect"
     spec:
       serviceAccount: elasticsearch
       serviceAccountName: elasticsearch

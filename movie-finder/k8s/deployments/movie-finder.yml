@@ -6,6 +6,7 @@ spec:
   selector:
     matchLabels: 
       app: movie-finder
+      role: es-connect
   replicas: 2
   template: 
     metadata:

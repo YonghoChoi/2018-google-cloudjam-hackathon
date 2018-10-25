@@ -43,9 +43,39 @@
 
 
 
-## 2. 엘라스틱서치 이미지 구성
+## 2 Movie Finder 이미지 생성
 
-### 2.1 Elasticsearch Dockerfile
+### 2.1 Movie Finder 빌드
+
+```shell
+cd movie-finder/app && \
+npm install && \
+npm run build
+```
+
+
+
+### 2.2 Movie Finder Dockerfile
+
+```Dockerfile
+FROM nginx
+
+RUN mkdir /app
+ADD ./app/dist/ /app
+ADD ./app/nginx/nginx.conf /etc/nginx/nginx.conf
+
+WORKDIR /app
+```
+
+* 앞서 진행한 빌드 산출물을 Docker 이미지에 추가
+* nginx를 사용하여 웹 호스팅
+* 이미지 빌드 및 푸시는 "4. Container Registry에 이미지 push" 참고
+
+
+
+## 3. 엘라스틱서치 이미지 생성
+
+### 3.1 Elasticsearch Dockerfile
 
 1. elasticsearch.yml 준비
 
@@ -56,7 +86,11 @@
    node.master: ${NODE_MASTER}
    node.data: ${NODE_DATA}
    node.ingest: ${NODE_INGEST}
-   search.remote.connect: false
+   
+   http.cors.enabled: true
+   http.cors.allow-origin: "*"
+   http.cors.allow-methods: OPTIONS, HEAD, GET, POST, PUT, DELETE
+   http.cors.allow-headers: "X-Requested-With,X-Auth-Token,Content-Type, Content-Length, Authorization"
    
    cloud:
      kubernetes:
@@ -77,11 +111,12 @@
    ENV NODE_MASTER=true
    ENV NODE_DATA=true
    ENV NODE_INGEST=false
+   ENV HTTP_ENABLED=true
    ENV SERVICE=es-k8s-cluster
    ENV KUBERNETES_NAMESPACE=default
    ENV NUMBER_OF_MASTERS=1
    
-   RUN yum install -y gcc-c++ make zip
+   RUN yum install -y gcc-c++ make zip deltarpm
    RUN wget http://www.kwangsiklee.com/wp-content/uploads/2017/02/mecab-0.996-ko-0.9.2.tar-1.gz
    RUN tar -xvzf mecab-0.996-ko-0.9.2.tar-1.gz
    RUN cd mecab-0.996-ko-0.9.2 && ./configure && make && make check && make install && ldconfig
@@ -92,19 +127,24 @@
    
    COPY --chown=elasticsearch:elasticsearch elasticsearch.yml /usr/share/elasticsearch/config/
    COPY --chown=elasticsearch:elasticsearch elasticsearch-analysis-seunjeon-6.1.1.0.zip /usr/share/elasticsearch/
+   COPY --chown=elasticsearch:elasticsearch elasticsearch-hangul-jamo-analyzer-6.2.3.zip /usr/share/elasticsearch/
    
    RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-analysis-seunjeon-6.1.1.0.zip
+   RUN ./bin/elasticsearch-plugin install file://`pwd`/elasticsearch-hangul-jamo-analyzer-6.2.3.zip
    RUN ./bin/elasticsearch-plugin install io.fabric8:elasticsearch-cloud-kubernetes:6.2.3.2
    ```
 
-   * 은전한닢이 6.1.1.0 이후에 지원이되고 있지 않는데, Elasticsearch 최신 버전 6.4.2에서는 플러그인의 디렉토리 구조가 변경되어 정상적으로 설치되지 않는다.
+   * 쿠버네티스 클러스터에서 엘라스틱서치 노드간 Discovery를 위해 fabric8 플러그인을 사용한다.
+   * fabric8 플러그인이 지원하는 엘라스틱서치의 최신 버전이 6.2.3이기 때문에 해당 버전의 엘라스틱서치 이미지를 사용한다.
+   * 은전한닢이 6.1.1.0 이후에 지원이되고 있지 않는데, 은전한닢 압축파일을 다운로드 받은 후 해당 파일 내 properties 파일을 수정하여 Elasticsearch 버전을 6.2.3 버전으로 맞춘다.
+     * Elasticsearch 현시점 최신 버전 6.4.2에서는 플러그인의 디렉토리 구조가 변경되어 플러그인 디렉토리 구조에서 elasticsearch 디렉토리 내 파일들을 상위로 이동 시켜서 사용한다.
    * 최신 버전에서는 플러그인 압축파일 내 elasticsearch 디렉토리를 사용하지 않기 때문에 여기서는 elasticsearch 디렉토리 제거한 zip 파일을 Docker 이미지에 Copy해서 사용한다.
    * 은전한닢 플러그인 설치 시에 elasticsearch.yml 파일을 참조하기 때문에 위에서 작성한 elasticsearch.yml 파일로 대체하는 것은 가장 마지막에 수행한다.
-   * 쿠버네티스 클러스터에서 엘라스틱서치 노드간 Discovery를 위해 fabric8 플러그인을 사용한다.
+   * 이미지 빌드 및 푸시는 "4. Container Registry에 이미지 push" 참고
 
 
 
-### 2.2 Container Registry에 이미지 push
+### 4. Container Registry에 이미지 push
 
 1. docker가 설치 되어있다는 전제 하에 진행. 먼저 docker build로 이미지 만들기
 
@@ -148,24 +188,31 @@
 
 
 
-## 3. Kubernetes Elasticsearch Cluster 구성
+## 5. Kubernetes Elasticsearch Cluster 구성
 
-### 3.1 Deployment 구성
+### 5.1 Deployment 구성
 
 ```shell
 apiVersion: extensions/v1beta1
-kind: Deployment
+kind: "Deployment"
 metadata:
-  name: elasticsearch
+  name: "elasticsearch-data"
 spec:
-  replicas: 1
+  replicas: 2
+  selector:
+    matchLabels:
+      component: "elasticsearch"
+      type: "data"
+      provider: "fabric8"
   template:
     metadata:
       labels:
-        app: elasticsearch
-        role: master
-        version: 6.4.2
+        component: "elasticsearch"
+        type: "data"
+        provider: "fabric8"
     spec:
+      serviceAccount: elasticsearch
+      serviceAccountName: elasticsearch
       initContainers:
       - name: init-pod
         image: busybox:1.27.2
@@ -176,47 +223,53 @@ spec:
         securityContext:
           privileged: true
       containers:
-      - name: elasticsearch
-        image: "gcr.io/gcp-summit-2018/elasticsearch:6.4.2"
-        ports:
-        - name: es-external
-          containerPort: 9200
-          hostPort: 9200
-        - name: transport
-          containerPort: 9300
-          hostPort: 9300
-        env:
-        - name: CLUSTER_NAME
-          value: gcp-summit-es
-        - name: NUMBER_OF_MASTERS
-          value: "1"
-        - name: NODE_MASTER
-          value: "true"
-        - name: NODE_INGEST
-          value: "false"
-        - name: NODE_DATA
-          value: "false"
-        - name: NETWORK_HOST
-          value: "0.0.0.0"
-        - name: ES_JAVA_OPTS
-          value: -Xms256m -Xmx256m
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 9200
-          initialDelaySeconds: 10
-          periodSeconds: 15
-          timeoutSeconds: 5
+        - env:
+            - name: "SERVICE"
+              value: "elasticsearch-cluster"
+            - name: "KUBERNETES_NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+            - name: "NODE_MASTER"
+              value: "true"
+            - name: "NODE_DATA"
+              value: "true"
+            - name: "NODE_INGEST"
+              value: "true"
+            - name: "ES_JAVA_OPTS"
+              value: "-Xms1g -Xmx1g"
+          image: "gcr.io/gcp-summit-2018/elasticsearch:6.2.3"
+          imagePullPolicy: Always
+          name: "elasticsearch"
+          ports:
+            - containerPort: 9300
+              name: "transport"
+          volumeMounts:
+            - mountPath: "/usr/share/elasticsearch/data"
+              name: "elasticsearch-data"
+              readOnly: false
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+      volumes:
+        - emptyDir:
+            medium: ""
+          name: "elasticsearch-data"
 ```
 
+* 환경 변수 설정을 제외하고 coordinating node, data node, master node 형식 동일
 * initContainers를 통해 Pod의 설정 초기화
 * readinessProbe를 통해 실행 가능 여부 체크
 
 
 
-### 3.2 서비스 구성
+### 5.2 서비스 구성
 
-### Discovery를 위한 Service 작성
+#### 5.2.1 Discovery를 위한 Service 작성
 
 ```yaml
 apiVersion: v1
@@ -237,33 +290,28 @@ spec:
 * 내부통신이기 때문에 로드밸런서 타입은 ClusterIP를 사용한다.
 
 
-#### 3.2.1 외부에서 쿼리 요청을 받기 위한 Service 작성
+
+#### 5.2.2 Movie finder 웹 서버와 통신하기 위한 Service 작성
 
 ```yaml
 apiVersion: v1
 kind: "Service"
 metadata:
-  name: "elasticsearch"
+  name: "elasticsearch-connector"
 spec:
   ports:
     - port: 9200
-      targetPort: "http"
+      targetPort: 9200
   selector:
-    component: "elasticsearch"
-    type: "coordinating-only"
-    provider: "fabric8"
-  type: "LoadBalancer"
+    role: "es-connect"
 ```
 
-- port는 서비스 레벨에서 pod와 매핑할 port 번호를 의미
-- targetPort는 Pod의 port 번호를 의미
-- NodePort의 Range가 30000-32767 이기 때문에 해당 범위내로 포트 변경
-- Node Selector에 명시된 label이 Pod에 적용이 되어 있어야 정상적으로 해당 Pod에 NodePort가 연결된다.
-- 위 예에서는 app=elasticsearch Label이 Pod에 정의 되어있어야함
+* 엘라스틱서치 클러스터에서 통신을 담당하는 coordinating node와 ClusterIP로 연결
+* Movie finder 웹 서버와 엘라스틱서치 coordinaiting node는 role=es-connect Label을 통해 서비스 연결
 
 
 
-### 3.2.2 Elasticsearch로 접속 확인
+### 5.3 Elasticsearch로 접속 확인
 
 1. 30001 방화벽 오픈
 
@@ -337,9 +385,60 @@ spec:
 
 
 
-## 4. Trouble Shooting
+## 6. Movie Finder Kubernetes 구성
 
-### 4.1 ConfigMap 사용
+### 6.2 Deployment
+
+```yaml
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: movie-finder-deployment
+spec:
+  selector:
+    matchLabels: 
+      app: movie-finder
+  replicas: 2
+  template: 
+    metadata:
+      labels:
+        app: movie-finder
+        role: es-connect
+    spec:
+      containers:
+      - name: movie-finder
+        image: wowyo3/movie-finder-javacafe
+        ports:
+        - containerPort: 8080
+```
+
+
+
+###6.3 사용자가 외부에서 접속할 수 있도록 Service 생성
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: movie-finder
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: movie-finder
+```
+
+* GCP 로드밸런서 생성
+* 내부의 웹 서버와 연동
+
+
+
+## 7. Trouble Shooting
+
+### 7.1 ConfigMap 사용
 
 * ConfigMap으로 설정관리 시 다음과 같이 설정했더니 오류 발생
 
@@ -437,14 +536,14 @@ spec:
 
 
 
-### 4.2 GCP Registry 사용
+### 7.2 GCP Registry 사용
 
 * 가이드대로 진행 했으나 권한 오류 발생
 * GCP의 Credential 관련 부분 확인 필요
 
 
 
-### 4.3 은전한닢 버전 호환 문제 해결
+### 7.3 은전한닢 버전 호환 문제 해결
 
 ```
 -> Downloading file:///usr/share/elasticsearch/elasticsearch-analysis-seunjeon-6.1.1.0.zip
@@ -471,7 +570,7 @@ The command '/bin/sh -c ./bin/elasticsearch-plugin install file://`pwd`/elastics
 
 
 
-## 5. 참고
+## 8. 참고
 
 * [엘라스틱서치 디스커버리 관련](https://github.com/fabric8io/elasticsearch-cloud-kubernetes/blob/master/README.md)
 * [headless-service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services)
